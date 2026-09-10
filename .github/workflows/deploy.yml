@@ -1,0 +1,70 @@
+name: Deploy to AWS Bedrock AgentCore
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC token
+  contents: read
+
+jobs:
+  deploy:
+    name: CDK Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: agentcore/cdk/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install CDK dependencies
+        working-directory: agentcore/cdk
+        run: npm ci
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk@$(node -e "console.log(require('./agentcore/cdk/package.json').devDependencies['aws-cdk'].replace('~',''))")
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: CDK Bootstrap (idempotent)
+        working-directory: agentcore/cdk
+        run: npx cdk bootstrap
+
+      - name: CDK Synth
+        working-directory: agentcore/cdk
+        run: npm run build && npx cdk synth
+
+      - name: CDK Deploy
+        working-directory: agentcore/cdk
+        run: npx cdk deploy --all --require-approval never --outputs-file cdk-outputs.json
+
+      - name: Upload CDK outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cdk-outputs
+          path: agentcore/cdk/cdk-outputs.json
