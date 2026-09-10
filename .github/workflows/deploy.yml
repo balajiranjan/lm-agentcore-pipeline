@@ -56,15 +56,15 @@ jobs:
 
       - name: CDK Bootstrap (idempotent)
         working-directory: agentcore/cdk
-        run: npx cdk bootstrap
+        run: npx cdk bootstrap aws://685306736016/us-east-1
 
       - name: CDK Synth
         working-directory: agentcore/cdk
-        run: npx cdk synth
+        run: npx cdk synth --verbose
 
       - name: CDK Deploy
         working-directory: agentcore/cdk
-        run: npx cdk deploy --all --require-approval never --outputs-file cdk-outputs.json
+        run: npx cdk deploy --all --require-approval never --verbose --outputs-file cdk-outputs.json
 
       - name: Upload CDK outputs
         uses: actions/upload-artifact@v4
